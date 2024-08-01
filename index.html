@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2048 Game</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #faf8ef; }
+        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background-color: #faf8ef; }
         #game-container { display: flex; flex-direction: column; align-items: center; }
-        #game { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background-color: #bbada0; padding: 10px; border-radius: 5px; position: relative; }
-        .cell { width: 100px; height: 100px; background-color: #cdc1b4; border-radius: 5px; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #776e65; transition: all 0.1s ease-in-out; position: relative; }
+        #game { display: grid; gap: 10px; background-color: #bbada0; padding: 10px; border-radius: 5px; position: relative; }
+        .cell { width: 80px; height: 80px; background-color: #cdc1b4; border-radius: 5px; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #776e65; transition: all 0.1s ease-in-out; position: relative; }
         .cell[data-value="2"] { background-color: #eee4da; }
         .cell[data-value="4"] { background-color: #ede0c8; }
         .cell[data-value="8"] { background-color: #f2b179; color: #f9f6f2; }
@@ -31,7 +31,9 @@
         .score-box { background-color: #bbada0; color: #f9f6f2; padding: 10px 20px; border-radius: 5px; font-size: 18px; }
         #game-over { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(238, 228, 218, 0.73); z-index: 100; flex-direction: column; justify-content: center; align-items: center; }
         #game-over h2 { font-size: 60px; font-weight: bold; margin-bottom: 20px; }
-        #new-game { font-size: 20px; padding: 10px 20px; background-color: #8f7a66; color: #f9f6f2; border: none; border-radius: 5px; cursor: pointer; }
+        button { font-size: 18px; padding: 10px 20px; background-color: #8f7a66; color: #f9f6f2; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        #controls { display: flex; justify-content: center; margin-top: 20px; }
+        #size-selector { font-size: 18px; padding: 10px; margin-right: 10px; }
     </style>
 </head>
 <body>
@@ -40,11 +42,20 @@
             <div id="score" class="score-box">Score: 0</div>
             <div id="high-score" class="score-box">High Score: 0</div>
         </div>
-        <div id="game"></div>
+        <div id="game" role="grid" aria-label="2048 game board"></div>
+        <div id="controls">
+            <select id="size-selector" aria-label="Select grid size">
+                <option value="4">4x4</option>
+                <option value="5">5x5</option>
+                <option value="6">6x6</option>
+            </select>
+            <button id="new-game">New Game</button>
+            <button id="undo">Undo</button>
+        </div>
     </div>
     <div id="game-over">
         <h2>Game Over!</h2>
-        <button id="new-game">New Game</button>
+        <button id="new-game-over">New Game</button>
     </div>
     <script>
         const game = document.getElementById('game');
@@ -52,13 +63,19 @@
         const highScoreElement = document.getElementById('high-score');
         const gameOverElement = document.getElementById('game-over');
         const newGameButton = document.getElementById('new-game');
-        let board = Array(16).fill(0);
+        const newGameOverButton = document.getElementById('new-game-over');
+        const undoButton = document.getElementById('undo');
+        const sizeSelector = document.getElementById('size-selector');
+        let board = [];
         let score = 0;
         let highScore = 0;
+        let size = 4;
+        let history = [];
 
         function initGame() {
-            board = Array(16).fill(0);
+            board = Array(size * size).fill(0);
             score = 0;
+            history = [];
             addNewTile();
             addNewTile();
             updateBoard();
@@ -78,13 +95,14 @@
 
         function updateBoard() {
             game.innerHTML = '';
+            game.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
             board.forEach((value, index) => {
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.textContent = value !== 0 ? value : '';
                 cell.setAttribute('data-value', value);
-                cell.style.gridRow = Math.floor(index / 4) + 1;
-                cell.style.gridColumn = (index % 4) + 1;
+                cell.setAttribute('role', 'gridcell');
+                cell.setAttribute('aria-label', value !== 0 ? value : 'empty');
                 game.appendChild(cell);
             });
         }
@@ -107,6 +125,7 @@
                 case 'ArrowRight': moved = move(1, 0); break;
             }
             if (moved) {
+                history.push({board: [...board], score: score});
                 let newTileIndex = addNewTile();
                 updateBoard();
                 updateScore();
@@ -121,34 +140,34 @@
             let moved = false;
             let mergedTiles = [];
             
-            function traverse(x, y, callback) {
-                for (let i = 0; i < 4; i++) {
-                    for (let j = 0; j < 4; j++) {
-                        let row = dx > 0 ? 3 - i : i;
-                        let col = dy > 0 ? 3 - j : j;
+            function traverse(callback) {
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        let row = dx > 0 || dy > 0 ? size - 1 - i : i;
+                        let col = dx > 0 || dy > 0 ? size - 1 - j : j;
                         callback(row, col);
                     }
                 }
             }
 
-            traverse(dx, dy, (row, col) => {
-                if (board[row * 4 + col] !== 0) {
+            traverse((row, col) => {
+                if (board[row * size + col] !== 0) {
                     let newRow = row + dy;
                     let newCol = col + dx;
-                    while (newRow >= 0 && newRow < 4 && newCol >= 0 && newCol < 4) {
-                        if (board[newRow * 4 + newCol] === 0) {
-                            board[newRow * 4 + newCol] = board[row * 4 + col];
-                            board[row * 4 + col] = 0;
+                    while (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size) {
+                        if (board[newRow * size + newCol] === 0) {
+                            board[newRow * size + newCol] = board[row * size + col];
+                            board[row * size + col] = 0;
                             row = newRow;
                             col = newCol;
                             moved = true;
-                        } else if (board[newRow * 4 + newCol] === board[row * 4 + col] && !mergedTiles.includes(newRow * 4 + newCol)) {
-                            board[newRow * 4 + newCol] *= 2;
-                            score += board[newRow * 4 + newCol];
-                            board[row * 4 + col] = 0;
+                        } else if (board[newRow * size + newCol] === board[row * size + col] && !mergedTiles.includes(newRow * size + newCol)) {
+                            board[newRow * size + newCol] *= 2;
+                            score += board[newRow * size + newCol];
+                            board[row * size + col] = 0;
                             moved = true;
-                            mergedTiles.push(newRow * 4 + newCol);
-                            animateMergedTile(newRow * 4 + newCol);
+                            mergedTiles.push(newRow * size + newCol);
+                            animateMergedTile(newRow * size + newCol);
                         }
                         break;
                         newRow += dy;
@@ -176,12 +195,12 @@
 
         function isGameOver() {
             if (board.includes(0)) return false;
-            for (let i = 0; i < 4; i++) {
-                for (let j = 0; j < 4; j++) {
-                    let current = board[i * 4 + j];
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    let current = board[i * size + j];
                     if (
-                        (j < 3 && current === board[i * 4 + j + 1]) ||
-                        (i < 3 && current === board[(i + 1) * 4 + j])
+                        (j < size - 1 && current === board[i * size + j + 1]) ||
+                        (i < size - 1 && current === board[(i + 1) * size + j])
                     ) {
                         return false;
                     }
@@ -190,8 +209,25 @@
             return true;
         }
 
+        function undo() {
+            if (history.length > 0) {
+                let lastState = history.pop();
+                board = lastState.board;
+                score = lastState.score;
+                updateBoard();
+                updateScore();
+            }
+        }
+
         newGameButton.addEventListener('click', initGame);
+        newGameOverButton.addEventListener('click', initGame);
+        undoButton.addEventListener('click', undo);
         document.addEventListener('keydown', handleKeyPress);
+
+        sizeSelector.addEventListener('change', (e) => {
+            size = parseInt(e.target.value);
+            initGame();
+        });
 
         // Touch events for mobile support
         let touchStartX, touchStartY;
