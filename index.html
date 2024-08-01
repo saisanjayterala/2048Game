@@ -5,21 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2048 Game</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #faf8ef; }
+        #game-container { display: flex; flex-direction: column; align-items: center; }
         #game { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background-color: #bbada0; padding: 10px; border-radius: 5px; }
-        .cell { width: 100px; height: 100px; background-color: #cdc1b4; border-radius: 5px; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; }
+        .cell { width: 100px; height: 100px; background-color: #cdc1b4; border-radius: 5px; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #776e65; transition: all 0.1s ease-in-out; }
+        .cell[data-value="2"] { background-color: #eee4da; }
+        .cell[data-value="4"] { background-color: #ede0c8; }
+        .cell[data-value="8"] { background-color: #f2b179; color: #f9f6f2; }
+        .cell[data-value="16"] { background-color: #f59563; color: #f9f6f2; }
+        .cell[data-value="32"] { background-color: #f67c5f; color: #f9f6f2; }
+        .cell[data-value="64"] { background-color: #f65e3b; color: #f9f6f2; }
+        .cell[data-value="128"], .cell[data-value="256"], .cell[data-value="512"], .cell[data-value="1024"], .cell[data-value="2048"] { background-color: #edcf72; color: #f9f6f2; font-size: 20px; }
+        #score { font-size: 24px; margin-bottom: 20px; }
+        #game-over { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(238, 228, 218, 0.73); z-index: 100; flex-direction: column; justify-content: center; align-items: center; }
+        #game-over h2 { font-size: 60px; font-weight: bold; margin-bottom: 20px; }
+        #new-game { font-size: 20px; padding: 10px 20px; background-color: #8f7a66; color: #f9f6f2; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div id="game"></div>
+    <div id="game-container">
+        <div id="score">Score: 0</div>
+        <div id="game"></div>
+    </div>
+    <div id="game-over">
+        <h2>Game Over!</h2>
+        <button id="new-game">New Game</button>
+    </div>
     <script>
         const game = document.getElementById('game');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('game-over');
+        const newGameButton = document.getElementById('new-game');
         let board = Array(16).fill(0);
+        let score = 0;
 
         function initGame() {
+            board = Array(16).fill(0);
+            score = 0;
             addNewTile();
             addNewTile();
             updateBoard();
+            updateScore();
+            gameOverElement.style.display = 'none';
         }
 
         function addNewTile() {
@@ -36,8 +63,13 @@
                 const cell = document.createElement('div');
                 cell.className = 'cell';
                 cell.textContent = value !== 0 ? value : '';
+                cell.setAttribute('data-value', value);
                 game.appendChild(cell);
             });
+        }
+
+        function updateScore() {
+            scoreElement.textContent = `Score: ${score}`;
         }
 
         document.addEventListener('keydown', handleKeyPress);
@@ -53,6 +85,10 @@
             if (moved) {
                 addNewTile();
                 updateBoard();
+                updateScore();
+                if (isGameOver()) {
+                    gameOverElement.style.display = 'flex';
+                }
             }
         }
 
@@ -64,6 +100,7 @@
                 for (let j = 0; j < filteredRow.length - 1; j++) {
                     if (filteredRow[j] === filteredRow[j + 1]) {
                         filteredRow[j] *= 2;
+                        score += filteredRow[j];
                         filteredRow[j + 1] = 0;
                         moved = true;
                     }
@@ -100,6 +137,24 @@
         function transpose(arr) {
             return arr.map((_, i) => arr.filter((_, j) => i % 4 === j % 4));
         }
+
+        function isGameOver() {
+            if (board.includes(0)) return false;
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    let current = board[i * 4 + j];
+                    if (
+                        (j < 3 && current === board[i * 4 + j + 1]) ||
+                        (i < 3 && current === board[(i + 1) * 4 + j])
+                    ) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        newGameButton.addEventListener('click', initGame);
 
         initGame();
     </script>
